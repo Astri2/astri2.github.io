@@ -1,0 +1,2 @@
+npx vite build
+git subtree push --prefix dist origin deploy
