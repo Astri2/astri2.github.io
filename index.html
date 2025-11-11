@@ -222,23 +222,37 @@ function createCamera()
 
 function createDisplaySurfaces()
 {
+    var side = 300.0;
+    var half = side / 2.0;
+
     displaySurfaces = [];
     // FRONT SCREEN
     var frontScreen = new DisplaySurface("Front", 
-        new THREE.Vector3(-150.0, -150.0, -150.0), 
-        new THREE.Vector3(300.0, 0.0,   0.0), 
-        new THREE.Vector3(0.0, 300.0,   0.0));
+        new THREE.Vector3(-half, -half, -half), 
+        new THREE.Vector3( side,  0.0,   0.0), 
+        new THREE.Vector3( 0.0,   side,  0.0));
     displaySurfaces.push(frontScreen);
 
     // LEFT SCREEN
     var leftScreen = new DisplaySurface("Left",
-        new THREE.Vector3(-150.0, -150.0, 150.0), 
-        new THREE.Vector3(0.0, 0.0,  -300.0), 
-        new THREE.Vector3(0.0, 300.0,   0.0));
+        new THREE.Vector3(-half, -half,  half), 
+        new THREE.Vector3( 0.0,   0.0,  -side), 
+        new THREE.Vector3( 0.0,   side,  0.0));
     displaySurfaces.push(leftScreen);
-	
-	// to be completed by you
-	
+
+    // RIGHT SCREEN
+    var rightScreen = new DisplaySurface("Right",
+        new THREE.Vector3( half, -half, -half), 
+        new THREE.Vector3( 0.0,   0.0,   side),
+        new THREE.Vector3( 0.0,   side,  0.0));
+    displaySurfaces.push(rightScreen);
+
+    // Floor SCREEN
+    var floorScreen = new DisplaySurface("Floor",
+        new THREE.Vector3(-half, -half,  half), 
+        new THREE.Vector3( side,  0.0,   0.0),
+        new THREE.Vector3( 0.0,   0.0,  -side));
+    displaySurfaces.push(floorScreen);
 }
 
 function getLeftEyePosition()
