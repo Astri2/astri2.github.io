@@ -33,10 +33,11 @@ class DisplaySurface
 	viewMatrix(eye)
 	{
 		// to be written by you!
-
-		var target = new THREE.Vector3(0,0,0);	
+        var n = new THREE.Vector3().crossVectors(this.u, this.v).normalize();
+        var target = new THREE.Vector3().subVectors(eye, n);
 		var upVector = new THREE.Vector3(0,1,0);	
-		var mat = new THREE.Matrix4();
+		
+        var mat = new THREE.Matrix4();
 		mat = mat.lookAt(eye, target, upVector); // this lookAt version creates only a rotation matrix
 		var translate = new THREE.Matrix4().makeTranslation(-eye.x, -eye.y, -eye.z);
 		mat = mat.multiplyMatrices(mat, translate);
@@ -46,11 +47,22 @@ class DisplaySurface
     projectionMatrix(eye, znear, zfar)
     {
 		// to be written by you!
+        var n = new THREE.Vector3().crossVectors(this.u, this.v).normalize(); 
+        var d = -n.dot(new THREE.Vector3().subVectors(this.origin,eye));
 
-        var left = -1;
-        var right = 1;
-        var bottom = -1;
-        var top = 1;
+        var uDir = this.u.clone().normalize();
+        var vDir = this.v.clone().normalize();
+        
+        var lprim = new THREE.Vector3().subVectors(this.origin, eye).dot(uDir);        
+        var rprim = new THREE.Vector3().addVectors(this.origin, this.u).sub(eye).dot(uDir);        
+        var bprim = new THREE.Vector3().subVectors(this.origin, eye).dot(vDir);
+        var tprim =  new THREE.Vector3().addVectors(this.origin, this.v).sub(eye).dot(vDir);
+
+        var left = (lprim * znear)/d;
+        var right = (rprim * znear)/d;
+        var bottom = (bprim * znear)/d;
+        var top = (tprim * znear)/d;
+        
         return new THREE.Matrix4().makePerspective(left, right, top, bottom, znear, zfar);
     }
 }
@@ -358,7 +370,17 @@ window.addEventListener( 'keydown', function ( event )
 				//console.log(viewB);
 				break;
                 
-                    
+            case 'KeyY':
+                var projF = displaySurfaces[0].projectionMatrix(new THREE.Vector3(50,20,100), 0.1, 100);
+                var projL = displaySurfaces[1].projectionMatrix(new THREE.Vector3(50,20,100), 0.1, 100);
+				var projR = displaySurfaces[2].projectionMatrix(new THREE.Vector3(50,20,100), 0.1, 100);
+				var projB = displaySurfaces[3].projectionMatrix(new THREE.Vector3(50,20,100), 0.1, 100);
+				console.log("Projection matrices:");
+				console.log(projF);
+				console.log(projL);
+				console.log(projR);
+				console.log(projB);
+                break;        
 }
 });
 
