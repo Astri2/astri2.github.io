@@ -151,7 +151,7 @@ function createRenderer()
     */
 
     // /*
-    renderer = new THREE.WebGLRenderer({preserveDrawingBuffer: true, antialiasing: true, alpha: true});
+    renderer = new THREE.WebGLRenderer({preserveDrawingBuffer: true, antialiasing: true});
     renderer.autoClear = false;
     renderer.setPixelRatio( window.devicePixelRatio );
     renderer.setSize(window.innerWidth, window.innerHeight);
@@ -161,6 +161,10 @@ function createRenderer()
     renderer.xr.cameraAutoUpdate = false;
     document.body.appendChild(renderer.domElement);
     // */
+
+    
+    renderer.xr.addEventListener('sessionstart', () => { orbitControl.enabled = false; });
+    renderer.xr.addEventListener('sessionend', () => { orbitControl.enabled = true; });
 
 }
 
@@ -330,17 +334,22 @@ function onWindowResize() {
 // refresh function
 var animate = function () {
     var gl = renderer.getContext();
-
-    /*
-    requestAnimationFrame(animate);
-    */
     
+
+
     // 1. render scene objects
 	renderer.setClearColor(0x808080);
     renderer.clear();
     if (showScene)
         renderer.render(scene, camera);
     
+    var alpha = 1
+
+    const renderTargetSaved = renderer.getRenderTarget();
+    const xrEnabledSaved = renderer.xr.enabled;
+    // Disable XR for off-screen rendering
+    renderer.xr.enabled = false;
+
     // 2. render scene objects onto a texture, for each target
     for (let [index, displaySurface] of displaySurfaces.entries())
     {
@@ -349,7 +358,7 @@ var animate = function () {
         renderer.clear();
 
 		// left eye on RED channel
-        gl.colorMask(1, 0, 0, 0); 
+        gl.colorMask(1, 0, 0, alpha); 
 		var eye = getLeftEyePosition();
 		var view = displaySurface.viewMatrix(eye);
 		var proj = displaySurface.projectionMatrix(eye, 1, 10000);
@@ -357,7 +366,7 @@ var animate = function () {
         renderer.render(scene, leftCamera); 
     
 		// right eye on GREEN, BLUE channels
-		gl.colorMask(0, 1, 1, 0);
+		gl.colorMask(0, 1, 1, alpha);
 		var eye = getRightEyePosition();
 		var view = displaySurface.viewMatrix(eye);
 		var proj = displaySurface.projectionMatrix(eye, 1, 10000);
@@ -365,18 +374,22 @@ var animate = function () {
         renderer.clearDepth();
         renderer.render(scene, rightCamera); 
 		
-        gl.colorMask(1, 1, 1, 0);
+        gl.colorMask(1, 1, 1, alpha);
     }
+
+
     // restore state
     renderer.setRenderTarget(null);
     renderer.setClearColor(0x000000);
+
+    // Restore original state
+    renderer.setRenderTarget(renderTargetSaved);
+    renderer.xr.enabled = xrEnabledSaved;
   
     // 3. render display surfaces as (textured) quads
     renderer.render(displaySurfaceScene, camera);
-	
-	// 4. render eyes
+
     renderer.render(eyeScene, camera);
-	
 };
 
 
