@@ -151,7 +151,7 @@ function createRenderer()
     */
 
     // /*
-    renderer = new THREE.WebGLRenderer({preserveDrawingBuffer: true, antialiasing: true});
+    renderer = new THREE.WebGLRenderer({preserveDrawingBuffer: true, antialiasing: true, alpha: true});
     renderer.autoClear = false;
     renderer.setPixelRatio( window.devicePixelRatio );
     renderer.setSize(window.innerWidth, window.innerHeight);
