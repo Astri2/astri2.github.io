@@ -158,7 +158,7 @@ function createRenderer()
     renderer.setAnimationLoop(animate);
     renderer.shadowMap.enabled = true;
     renderer.xr.enabled = true;
-    renderer.xr.cameraAutoUpdate = false;
+    renderer.xr.cameraAutoUpdate = true;
     document.body.appendChild(renderer.domElement);
     // */
 
@@ -332,64 +332,120 @@ function onWindowResize() {
 }
 
 // refresh function
-var animate = function () {
-    var gl = renderer.getContext();
-    
+const animate = function () {
+  const gl = renderer.getContext();
 
+  const xrActive = renderer.xr.isPresenting;
+  // Get the active scene camera: XR camera when presenting, else the orbit camera
+  const sceneCam = xrActive ? renderer.xr.getCamera(camera) : camera;
 
-    // 1. render scene objects
-	renderer.setClearColor(0x808080);
-    renderer.clear();
-    if (showScene)
-        renderer.render(scene, camera);
-    
-    var alpha = 1
-
-    const renderTargetSaved = renderer.getRenderTarget();
-    const xrEnabledSaved = renderer.xr.enabled;
-    // Disable XR for off-screen rendering
-    renderer.xr.enabled = false;
-
-    // 2. render scene objects onto a texture, for each target
-    for (let [index, displaySurface] of displaySurfaces.entries())
-    {
-        renderer.setRenderTarget(displaySurfaceTargets[index]);
-        renderer.setClearColor(0x404040);
-        renderer.clear();
-
-		// left eye on RED channel
-        gl.colorMask(1, 0, 0, alpha); 
-		var eye = getLeftEyePosition();
-		var view = displaySurface.viewMatrix(eye);
-		var proj = displaySurface.projectionMatrix(eye, 1, 10000);
-        var leftCamera = cameraFromViewProj(view, proj);
-        renderer.render(scene, leftCamera); 
-    
-		// right eye on GREEN, BLUE channels
-		gl.colorMask(0, 1, 1, alpha);
-		var eye = getRightEyePosition();
-		var view = displaySurface.viewMatrix(eye);
-		var proj = displaySurface.projectionMatrix(eye, 1, 10000);
-        var rightCamera = cameraFromViewProj(view, proj);
-        renderer.clearDepth();
-        renderer.render(scene, rightCamera); 
-		
-        gl.colorMask(1, 1, 1, alpha);
+  // If XR is active, get the per-eye world positions from xrCamera.cameras
+  let realEyeL = null;
+  let realEyeR = null;
+  if (xrActive) {
+    const xrCam = renderer.xr.getCamera(camera);
+    // xrCam.cameras is an array of sub-cameras (one per view)
+    // Usually 0 = left, 1 = right, but verify length
+    if (xrCam.cameras && xrCam.cameras.length >= 2) {
+      realEyeL = new THREE.Vector3().setFromMatrixPosition(xrCam.cameras[0].matrixWorld);
+      realEyeR = new THREE.Vector3().setFromMatrixPosition(xrCam.cameras[1].matrixWorld);
+    } else {
+      // fallback to viewer position if not available
+      realEyeL = new THREE.Vector3().setFromMatrixPosition(xrCam.matrixWorld);
+      realEyeR = realEyeL.clone();
     }
 
+    // Optionally update your debug head/eyes to follow the real headset
+    const head = eyeScene.getObjectByName("Head");
+    if (head) head.position.copy(new THREE.Vector3().addVectors(realEyeL, realEyeR).multiplyScalar(0.5));
+    const eL = eyeScene.getObjectByName("EyeL");
+    const eR = eyeScene.getObjectByName("EyeR");
+    if (eL) eL.getWorldPosition(new THREE.Vector3()); // ensure world transforms are OK
+    if (eL) eL.position.copy(realEyeL.clone().sub(head.position));
+    if (eR) eR.position.copy(realEyeR.clone().sub(head.position));
+  }
 
-    // restore state
-    renderer.setRenderTarget(null);
-    renderer.setClearColor(0x000000);
+  // 1) Render main scene using sceneCam (XR camera when presenting)
+  renderer.setClearColor(0x808080);
+  renderer.clear();
+  if (showScene) renderer.render(scene, sceneCam);
 
-    // Restore original state
-    renderer.setRenderTarget(renderTargetSaved);
-    renderer.xr.enabled = xrEnabledSaved;
-  
-    // 3. render display surfaces as (textured) quads
-    renderer.render(displaySurfaceScene, camera);
+  // 2) Offscreen stereo render: disable XR state temporarily so offscreen passes are isolated
+  const prevXrEnabled = renderer.xr.enabled;
+  renderer.xr.enabled = false;
 
-    renderer.render(eyeScene, camera);
+  for (const [index, displaySurface] of displaySurfaces.entries()) {
+    renderer.setRenderTarget(displaySurfaceTargets[index]);
+    renderer.setClearColor(0x404040);
+    renderer.clear();
+
+    // For left eye: use realEyeL if available, else fallback to your eyeScene positions
+    const eyeLpos = realEyeL ? realEyeL : getLeftEyePosition();
+    const viewL = displaySurface.viewMatrix(eyeLpos);
+    const projL = displaySurface.projectionMatrix(eyeLpos, 1, 10000);
+    gl.colorMask(true, false, false, false);
+    {
+      const camL = cameraFromViewProj(viewL, projL);
+      renderer.render(scene, camL);
+    }
+
+    // For right eye: use realEyeR if available
+    const eyeRpos = realEyeR ? realEyeR : getRightEyePosition();
+    const viewR = displaySurface.viewMatrix(eyeRpos);
+    const projR = displaySurface.projectionMatrix(eyeRpos, 1, 10000);
+    gl.colorMask(false, true, true, false);
+    {
+      const camR = cameraFromViewProj(viewR, projR);
+      renderer.clearDepth();
+      renderer.render(scene, camR);
+    }
+
+    gl.colorMask(true, true, true, true);
+  }
+
+  // restore XR enable state
+  renderer.xr.enabled = prevXrEnabled;
+
+  // restore target and final render of walls / debug objects
+  renderer.setRenderTarget(null);
+  renderer.setClearColor(0x000000);
+
+  // Walls are fixed in world: render with the static camera (your orbit camera)
+  renderer.render(displaySurfaceScene, camera);
+
+  // Render debug head/eyes in world (we set their position above from xr pose)
+  renderer.render(eyeScene, camera);
+
+  /*
+
+    // inside your setAnimationLoop / animate() which runs each frame
+    if (renderer.xr.isPresenting) {
+        const xrCam = renderer.xr.getCamera(camera);        // XR Camera with .cameras[]
+        if (xrCam.cameras && xrCam.cameras.length >= 1) {
+            // left eye (usually index 0) world position
+            const leftPos = new THREE.Vector3().setFromMatrixPosition(xrCam.cameras[0].matrixWorld);
+            // right eye (usually index 1) world position (if present)
+            const rightPos = xrCam.cameras[1]
+            ? new THREE.Vector3().setFromMatrixPosition(xrCam.cameras[1].matrixWorld)
+            : leftPos.clone();
+
+            // head / viewer position as midpoint between eyes
+            const headPos = new THREE.Vector3().addVectors(leftPos, rightPos).multiplyScalar(0.5);
+
+            console.log('left', leftPos.x.toFixed(3), leftPos.y.toFixed(3), leftPos.z.toFixed(3));
+            console.log('right', rightPos.x.toFixed(3), rightPos.y.toFixed(3), rightPos.z.toFixed(3));
+            console.log('head', headPos.x.toFixed(3), headPos.y.toFixed(3), headPos.z.toFixed(3));
+        } else {
+            // fallback: use xrCam.matrixWorld if sub-cameras are not available
+            const viewerPos = new THREE.Vector3().setFromMatrixPosition(xrCam.matrixWorld);
+            console.log('viewer', viewerPos.x.toFixed(3), viewerPos.y.toFixed(3), viewerPos.z.toFixed(3));
+        }
+    } else {
+    // not presenting: use your regular camera
+    const pos = camera.position;
+    console.log('mono camera', pos.x.toFixed(3), pos.y.toFixed(3), pos.z.toFixed(3));
+    }
+*/
 };
 
 
