@@ -19,7 +19,11 @@ for alternative installations -->
 <script src="https://unpkg.com/three@0.139.2/examples/js/controls/DragControls.js"></script>
 <script src="https://unpkg.com/three@0.139.2/examples/js/geometries/TeapotGeometry.js"></script>
 
-<script>
+
+<script type="module">
+
+import { XRButton } from 'three/addons/webxr/XRButton.js';
+
 class DisplaySurface 
 {
     constructor(name, origin, u_vector, v_vector) 
@@ -139,10 +143,25 @@ function createEyeScene()
 
 function createRenderer()
 {
+    /*
     renderer = new THREE.WebGLRenderer({preserveDrawingBuffer: true});
     renderer.autoClear = false;
     renderer.setSize(window.innerWidth, window.innerHeight);
     document.body.appendChild(renderer.domElement);
+    */
+
+    // /*
+    renderer = new THREE.WebGLRenderer({preserveDrawingBuffer: true, antialiasing: true});
+    renderer.autoClear = false;
+    renderer.setPixelRatio( window.devicePixelRatio );
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.setAnimationLoop(animate);
+    renderer.shadowMap.enabled = true;
+    renderer.xr.enabled = true;
+    renderer.xr.cameraAutoUpdate = false;
+    document.body.appendChild(renderer.domElement);
+    // */
+
 }
 
 function enableOrbitCamera(cam, renderer)
@@ -291,11 +310,31 @@ function cameraFromViewProj(view, proj)
 	return cam;
 }
 
+function addXRButton() 
+{
+    document.body.appendChild( XRButton.createButton( renderer, {
+					'optionalFeatures': [ 'depth-sensing' ],
+					'depthSensing': { 'usagePreference': [ 'gpu-optimized' ], 'dataFormatPreference': [] }
+    } ) );
+}
+
+function onWindowResize() {
+
+				camera.aspect = window.innerWidth / window.innerHeight;
+				camera.updateProjectionMatrix();
+
+				renderer.setSize( window.innerWidth, window.innerHeight );
+
+}
+
 // refresh function
 var animate = function () {
     var gl = renderer.getContext();
-    requestAnimationFrame(animate);
 
+    /*
+    requestAnimationFrame(animate);
+    */
+    
     // 1. render scene objects
 	renderer.setClearColor(0x808080);
     renderer.clear();
@@ -383,10 +422,12 @@ window.addEventListener( 'keydown', function ( event )
                 break;        
 }
 });
+window.addEventListener( 'resize', onWindowResize );
 
 
 
 createRenderer();  			// create WebGL renderer
+addXRButton(); // add the cute little button :)
 createDisplaySurfaces();	// Display surfaces
 createDisplaySurfaceTargets(); // Textures for the display surfaces
 createDisplaySurfaceScene();	// 3D objects for the display surfaces
@@ -396,6 +437,7 @@ createCamera();		// a third-person camera
 enableOrbitCamera(camera, renderer);  // basic camera control
 addDragControlToObjects();	// allow some objects to be dragged
 animate();
+
 
 
 		</script>
