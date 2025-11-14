@@ -75,7 +75,7 @@ class DisplaySurface
 var renderer, scene, camera;
 var displaySurfaces, displaySurfaceScene, displaySurfaceTargets;
 var eyeCenter, eyeScene; 
-var orbitControl;
+var orbitControl, controls;
 var showScene = false;
 
 function addDragControlToObjects()
@@ -86,7 +86,7 @@ function addDragControlToObjects()
     
 	//console.log(objects); 
 	
-    var controls = new THREE.DragControls( objects, camera, renderer.domElement );
+    controls = new THREE.DragControls( objects, camera, renderer.domElement );
     controls.addEventListener( 'hoveron', function ( event ) 
 		{
             orbitControl.enabled = false;
@@ -163,8 +163,14 @@ function createRenderer()
     // */
 
     
-    renderer.xr.addEventListener('sessionstart', () => { orbitControl.enabled = false; });
-    renderer.xr.addEventListener('sessionend', () => { orbitControl.enabled = true; });
+    renderer.xr.addEventListener('sessionstart', () => { 
+        orbitControl.enabled = false; 
+        controls.enabled = false;
+    });
+    renderer.xr.addEventListener('sessionend', () => { 
+        orbitControl.enabled = true; 
+        controls.enabled = true;
+    });
 
 }
 
@@ -332,120 +338,87 @@ function onWindowResize() {
 }
 
 // refresh function
-const animate = function () {
+var animate = function () {
   const gl = renderer.getContext();
 
   const xrActive = renderer.xr.isPresenting;
-  // Get the active scene camera: XR camera when presenting, else the orbit camera
   const sceneCam = xrActive ? renderer.xr.getCamera(camera) : camera;
 
-  // If XR is active, get the per-eye world positions from xrCamera.cameras
-  let realEyeL = null;
-  let realEyeR = null;
-  if (xrActive) {
-    const xrCam = renderer.xr.getCamera(camera);
-    // xrCam.cameras is an array of sub-cameras (one per view)
-    // Usually 0 = left, 1 = right, but verify length
-    if (xrCam.cameras && xrCam.cameras.length >= 2) {
-      realEyeL = new THREE.Vector3().setFromMatrixPosition(xrCam.cameras[0].matrixWorld);
-      realEyeR = new THREE.Vector3().setFromMatrixPosition(xrCam.cameras[1].matrixWorld);
-    } else {
-      // fallback to viewer position if not available
-      realEyeL = new THREE.Vector3().setFromMatrixPosition(xrCam.matrixWorld);
-      realEyeR = realEyeL.clone();
+    let realEyeL = null;
+    let realEyeR = null;
+    if (xrActive) {        
+        // sceneCam.cameras is an array of sub-cameras (one per view)
+        // Usually 0 = left, 1 = right, but verify length
+        if (sceneCam.cameras && sceneCam.cameras.length >= 2) {
+            realEyeL = new THREE.Vector3().setFromMatrixPosition(sceneCam.cameras[0].matrixWorld);
+            realEyeR = new THREE.Vector3().setFromMatrixPosition(sceneCam.cameras[1].matrixWorld);
+            let middlePoint = realEyeL.clone().add(realEyeR).multiplyScalar(0.5);
+            let half_IO = realEyeR.clone().sub(realEyeL).normalize().multiplyScalar(6.8/2);
+            realEyeL = middlePoint.clone().sub(half_IO);
+            realEyeR = middlePoint.clone().add(half_IO);
+
+            console.log('Realleft', realEyeL.toArray().map(v => v.toFixed(3)));
+            console.log('Realright', realEyeR.toArray().map(v => v.toFixed(3)));
+            console.log('Mid', middlePoint.toArray().map(v => v.toFixed(3)));
+        } else {
+            // fallback to viewer position if not available
+            realEyeL = new THREE.Vector3().setFromMatrixPosition(sceneCam.matrixWorld);
+            realEyeR = realEyeL.clone();
+        }
     }
 
-    // Optionally update your debug head/eyes to follow the real headset
-    const head = eyeScene.getObjectByName("Head");
-    if (head) head.position.copy(new THREE.Vector3().addVectors(realEyeL, realEyeR).multiplyScalar(0.5));
-    const eL = eyeScene.getObjectByName("EyeL");
-    const eR = eyeScene.getObjectByName("EyeR");
-    if (eL) eL.getWorldPosition(new THREE.Vector3()); // ensure world transforms are OK
-    if (eL) eL.position.copy(realEyeL.clone().sub(head.position));
-    if (eR) eR.position.copy(realEyeR.clone().sub(head.position));
-  }
-
-  // 1) Render main scene using sceneCam (XR camera when presenting)
   renderer.setClearColor(0x808080);
   renderer.clear();
   if (showScene) renderer.render(scene, sceneCam);
 
-  // 2) Offscreen stereo render: disable XR state temporarily so offscreen passes are isolated
+  // 2) Stereo offscreen rendering: temporarily disable XR
   const prevXrEnabled = renderer.xr.enabled;
   renderer.xr.enabled = false;
 
-  for (const [index, displaySurface] of displaySurfaces.entries()) {
+  for (let [index, displaySurface] of displaySurfaces.entries()) {
     renderer.setRenderTarget(displaySurfaceTargets[index]);
     renderer.setClearColor(0x404040);
     renderer.clear();
 
-    // For left eye: use realEyeL if available, else fallback to your eyeScene positions
-    const eyeLpos = realEyeL ? realEyeL : getLeftEyePosition();
-    const viewL = displaySurface.viewMatrix(eyeLpos);
-    const projL = displaySurface.projectionMatrix(eyeLpos, 1, 10000);
-    gl.colorMask(true, false, false, false);
+    
+    // Left eye -> RED
+    gl.colorMask(true, false, false, true);
     {
-      const camL = cameraFromViewProj(viewL, projL);
-      renderer.render(scene, camL);
+        const eyeL = realEyeL ? realEyeL : getLeftEyePosition();
+        const viewL = displaySurface.viewMatrix(eyeL);
+        const projL = displaySurface.projectionMatrix(eyeL, 1, 10000);
+        const camL = cameraFromViewProj(viewL, projL);
+        
+        renderer.render(scene, camL);
     }
-
-    // For right eye: use realEyeR if available
-    const eyeRpos = realEyeR ? realEyeR : getRightEyePosition();
-    const viewR = displaySurface.viewMatrix(eyeRpos);
-    const projR = displaySurface.projectionMatrix(eyeRpos, 1, 10000);
-    gl.colorMask(false, true, true, false);
+    
+    // Right eye -> BLUE
+    gl.colorMask(false, false, true, true);
     {
+      const eyeR = realEyeR ? realEyeR : getRightEyePosition();
+      const viewR = displaySurface.viewMatrix(eyeR);
+      const projR = displaySurface.projectionMatrix(eyeR, 1, 10000);
       const camR = cameraFromViewProj(viewR, projR);
       renderer.clearDepth();
+
       renderer.render(scene, camR);
     }
 
-    gl.colorMask(true, true, true, false);
+    gl.colorMask(true, true, true, true);
   }
 
-  // restore XR enable state
+  // Restore XR state
   renderer.xr.enabled = prevXrEnabled;
 
-  // restore target and final render of walls / debug objects
+  // 3) Restore target and clear
   renderer.setRenderTarget(null);
   renderer.setClearColor(0x000000);
 
-  // Walls are fixed in world: render with the static camera (your orbit camera)
+  // 4) Walls (fixed in world) with static camera
   renderer.render(displaySurfaceScene, camera);
 
-  // Render debug head/eyes in world (we set their position above from xr pose)
+  // 5) Debug head/eyes (fixed)
   renderer.render(eyeScene, camera);
-
-  /*
-
-    // inside your setAnimationLoop / animate() which runs each frame
-    if (renderer.xr.isPresenting) {
-        const xrCam = renderer.xr.getCamera(camera);        // XR Camera with .cameras[]
-        if (xrCam.cameras && xrCam.cameras.length >= 1) {
-            // left eye (usually index 0) world position
-            const leftPos = new THREE.Vector3().setFromMatrixPosition(xrCam.cameras[0].matrixWorld);
-            // right eye (usually index 1) world position (if present)
-            const rightPos = xrCam.cameras[1]
-            ? new THREE.Vector3().setFromMatrixPosition(xrCam.cameras[1].matrixWorld)
-            : leftPos.clone();
-
-            // head / viewer position as midpoint between eyes
-            const headPos = new THREE.Vector3().addVectors(leftPos, rightPos).multiplyScalar(0.5);
-
-            console.log('left', leftPos.x.toFixed(3), leftPos.y.toFixed(3), leftPos.z.toFixed(3));
-            console.log('right', rightPos.x.toFixed(3), rightPos.y.toFixed(3), rightPos.z.toFixed(3));
-            console.log('head', headPos.x.toFixed(3), headPos.y.toFixed(3), headPos.z.toFixed(3));
-        } else {
-            // fallback: use xrCam.matrixWorld if sub-cameras are not available
-            const viewerPos = new THREE.Vector3().setFromMatrixPosition(xrCam.matrixWorld);
-            console.log('viewer', viewerPos.x.toFixed(3), viewerPos.y.toFixed(3), viewerPos.z.toFixed(3));
-        }
-    } else {
-    // not presenting: use your regular camera
-    const pos = camera.position;
-    console.log('mono camera', pos.x.toFixed(3), pos.y.toFixed(3), pos.z.toFixed(3));
-    }
-*/
 };
 
 
