@@ -32,63 +32,6 @@
 
 			init();
 
-			class DisplaySurface 
-			{
-				constructor(name, origin, u_vector, v_vector) 
-				{
-					this.name = name;
-					this.origin = origin;
-					this.u = u_vector;
-					this.v = v_vector;
-				}
-
-				viewMatrix(eye)
-				{
-					// to be written by you!
-					var n = new THREE.Vector3().crossVectors(this.u, this.v).normalize();
-					var target = new THREE.Vector3().subVectors(eye, n);
-					var upVector = new THREE.Vector3(0,1,0);	
-					
-					var mat = new THREE.Matrix4();
-					mat = mat.lookAt(eye, target, upVector); // this lookAt version creates only a rotation matrix
-					var translate = new THREE.Matrix4().makeTranslation(-eye.x, -eye.y, -eye.z);
-					mat = mat.multiplyMatrices(mat, translate);
-					return mat;
-				}
-				
-				projectionMatrix(eye, znear, zfar)
-				{
-					// to be written by you!
-					var n = new THREE.Vector3().crossVectors(this.u, this.v).normalize(); 
-					var d = -n.dot(new THREE.Vector3().subVectors(this.origin,eye));
-
-					var uDir = this.u.clone().normalize();
-					var vDir = this.v.clone().normalize();
-					
-					var lprim = new THREE.Vector3().subVectors(this.origin, eye).dot(uDir);        
-					var rprim = new THREE.Vector3().addVectors(this.origin, this.u).sub(eye).dot(uDir);        
-					var bprim = new THREE.Vector3().subVectors(this.origin, eye).dot(vDir);
-					var tprim =  new THREE.Vector3().addVectors(this.origin, this.v).sub(eye).dot(vDir);
-
-					var left = (lprim * znear)/d;
-					var right = (rprim * znear)/d;
-					var bottom = (bprim * znear)/d;
-					var top = (tprim * znear)/d;
-					
-					return new THREE.Matrix4().makePerspective(left, right, top, bottom, znear, zfar);
-				}
-			}
-
-			function createLights(group)
-			{
-				var ambientLight = new THREE.AmbientLight(0x888888, 0.4);
-				group.add(ambientLight);
-				var pointLight = new THREE.PointLight(0xffffff, 0.8);
-				pointLight.position.z += 4;
-				group.add(pointLight);
-			}
-
-			// TODO: update init()
 			function init() {
 
 				container = document.createElement( 'div' );
@@ -221,53 +164,6 @@
 
 			}
 
-			function onKeyDown(event) {
-				switch ( event.code ) {
-				case 'KeyL': 
-					var eye = getLeftEyePosition();
-					camera.position.set(eye.x, eye.y, eye.z); 
-					break;
-					
-				case 'KeyR': 
-					var eye = getRightEyePosition();
-					camera.position.set(eye.x, eye.y, eye.z); 
-					break;
-					
-				case 'KeyS':
-					showScene = !showScene;
-					controls.enabled = showScene
-					break;
-					
-				case 'KeyT':
-					var viewF = displaySurfaces[0].viewMatrix(new THREE.Vector3(50,20,100));
-					var viewL = displaySurfaces[1].viewMatrix(new THREE.Vector3(50,20,100));
-					//var viewR = displaySurfaces[2].viewMatrix(new THREE.Vector3(50,20,100));
-					//var viewB = displaySurfaces[3].viewMatrix(new THREE.Vector3(50,20,100));
-					console.log("View matrices:");
-					console.log(viewF);
-					console.log(viewL);
-					//console.log(viewR);
-					//console.log(viewB);
-					break;
-					
-				case 'KeyY':
-					var projF = displaySurfaces[0].projectionMatrix(new THREE.Vector3(50,20,100), 0.1, 100);
-					var projL = displaySurfaces[1].projectionMatrix(new THREE.Vector3(50,20,100), 0.1, 100);
-					var projR = displaySurfaces[2].projectionMatrix(new THREE.Vector3(50,20,100), 0.1, 100);
-					var projB = displaySurfaces[3].projectionMatrix(new THREE.Vector3(50,20,100), 0.1, 100);
-					console.log("Projection matrices:");
-					console.log(projF);
-					console.log(projL);
-					console.log(projR);
-					console.log(projB);
-					break;
-				
-				case 'KeyV':
-					useVReyes = !useVReyes;
-					break;
-				}
-			}
-
 			function onWindowResize() {
 
 				camera.aspect = window.innerWidth / window.innerHeight;
@@ -277,39 +173,7 @@
 			}
 
 			//
-			function getLeftEyePosition()
-			{
-				var eye = eyeGroup.getObjectByName("EyeL");
-				return eye.getWorldPosition(new THREE.Vector3());
-			}
 
-			function getRightEyePosition()
-			{
-				var eye = eyeGroup.getObjectByName("EyeR");
-				return eye.getWorldPosition(new THREE.Vector3());
-			}
-
-			function cameraFromViewProj(view, proj)
-			{
-				var cam = camera.clone();
-				var inv = new THREE.Matrix4();
-				inv.copy(view).invert();
-				cam.position.set(inv.elements[12], inv.elements[13], inv.elements[14]);
-				cam.setRotationFromMatrix(view);
-				cam.projectionMatrix = proj.clone();
-				return cam;
-			}
-
-			function handleVRControllerButton(buttonId, source) {
-				if(source.handedness == "right") {
-					switch(buttonId) {
-						case 4: useVReyes = !useVReyes; break;
-						case 5: showScene = !showScene; break;
-					}
-				}
-			}
-
-			// todo update animate
 			function animate() {
 
 				const delta = clock.getDelta() * 60;

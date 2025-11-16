@@ -32,8 +32,6 @@
 			var showScene = false, useVReyes = true;
 			const prevButtonStates = new Map();
 
-			const clock = new THREE.Clock();
-
 			let container;
 			let camera, scene, raycaster, renderer;
 
@@ -41,6 +39,53 @@
 
 			let controller, controllerGrip;
 			let INTERSECTED;
+
+			class DisplaySurface 
+			{
+				constructor(name, origin, u_vector, v_vector) 
+				{
+					this.name = name;
+					this.origin = origin;
+					this.u = u_vector;
+					this.v = v_vector;
+				}
+
+				viewMatrix(eye)
+				{
+					// to be written by you!
+					var n = new THREE.Vector3().crossVectors(this.u, this.v).normalize();
+					var target = new THREE.Vector3().subVectors(eye, n);
+					var upVector = new THREE.Vector3(0,1,0);	
+					
+					var mat = new THREE.Matrix4();
+					mat = mat.lookAt(eye, target, upVector); // this lookAt version creates only a rotation matrix
+					var translate = new THREE.Matrix4().makeTranslation(-eye.x, -eye.y, -eye.z);
+					mat = mat.multiplyMatrices(mat, translate);
+					return mat;
+				}
+				
+				projectionMatrix(eye, znear, zfar)
+				{
+					// to be written by you!
+					var n = new THREE.Vector3().crossVectors(this.u, this.v).normalize(); 
+					var d = -n.dot(new THREE.Vector3().subVectors(this.origin,eye));
+
+					var uDir = this.u.clone().normalize();
+					var vDir = this.v.clone().normalize();
+					
+					var lprim = new THREE.Vector3().subVectors(this.origin, eye).dot(uDir);        
+					var rprim = new THREE.Vector3().addVectors(this.origin, this.u).sub(eye).dot(uDir);        
+					var bprim = new THREE.Vector3().subVectors(this.origin, eye).dot(vDir);
+					var tprim =  new THREE.Vector3().addVectors(this.origin, this.v).sub(eye).dot(vDir);
+
+					var left = (lprim * znear)/d;
+					var right = (rprim * znear)/d;
+					var bottom = (bprim * znear)/d;
+					var top = (tprim * znear)/d;
+					
+					return new THREE.Matrix4().makePerspective(left, right, top, bottom, znear, zfar);
+				}
+			}
 
 			init();
 
@@ -71,42 +116,7 @@
 				);
 				scene.add( room );
 
-				/*
-				scene.add( new THREE.HemisphereLight( 0xa5a5a5, 0x898989, 3 ) );
-
-				const light = new THREE.DirectionalLight( 0xffffff, 3 );
-				light.position.set( 1, 1, 1 ).normalize();
-				scene.add( light );
-				*/
-
 				createLights(scene)
-
-				const geometry = new THREE.BoxGeometry( 0.15, 0.15, 0.15 );
-
-				for ( let i = 0; i < 0; i ++ ) {
-
-					const object = new THREE.Mesh( geometry, new THREE.MeshLambertMaterial( { color: Math.random() * 0xffffff } ) );
-
-					object.position.x = Math.random() * 4 - 2;
-					object.position.y = Math.random() * 4;
-					object.position.z = Math.random() * 4 - 2;
-
-					object.rotation.x = Math.random() * 2 * Math.PI;
-					object.rotation.y = Math.random() * 2 * Math.PI;
-					object.rotation.z = Math.random() * 2 * Math.PI;
-
-					object.scale.x = Math.random() + 0.5;
-					object.scale.y = Math.random() + 0.5;
-					object.scale.z = Math.random() + 0.5;
-
-					object.userData.velocity = new THREE.Vector3();
-					object.userData.velocity.x = Math.random() * 0.01 - 0.005;
-					object.userData.velocity.y = Math.random() * 0.01 - 0.005;
-					object.userData.velocity.z = Math.random() * 0.01 - 0.005;
-
-					room.add( object );
-
-				}
 
 				renderer = new THREE.WebGLRenderer( { antialias: true } );
 				renderer.setPixelRatio( window.devicePixelRatio );
@@ -124,30 +134,51 @@
 
 			}
 
-			function buildController( data ) {
-
-				let geometry, material;
-
-				switch ( data.targetRayMode ) {
-
-					case 'tracked-pointer':
-
-						geometry = new THREE.BufferGeometry();
-						geometry.setAttribute( 'position', new THREE.Float32BufferAttribute( [ 0, 0, 0, 0, 0, - 1 ], 3 ) );
-						geometry.setAttribute( 'color', new THREE.Float32BufferAttribute( [ 0.5, 0.5, 0.5, 0, 0, 0 ], 3 ) );
-
-						material = new THREE.LineBasicMaterial( { vertexColors: true, blending: THREE.AdditiveBlending } );
-
-						return new THREE.Line( geometry, material );
-
-					case 'gaze':
-
-						geometry = new THREE.RingGeometry( 0.02, 0.04, 32 ).translate( 0, 0, - 1 );
-						material = new THREE.MeshBasicMaterial( { opacity: 0.5, transparent: true } );
-						return new THREE.Mesh( geometry, material );
-
+			function onKeyDown(event) {
+				switch ( event.code ) {
+				case 'KeyL': 
+					var eye = getLeftEyePosition();
+					camera.position.set(eye.x, eye.y, eye.z); 
+					break;
+					
+				case 'KeyR': 
+					var eye = getRightEyePosition();
+					camera.position.set(eye.x, eye.y, eye.z); 
+					break;
+					
+				case 'KeyS':
+					showScene = !showScene;
+					controls.enabled = showScene
+					break;
+					
+				case 'KeyT':
+					var viewF = displaySurfaces[0].viewMatrix(new THREE.Vector3(50,20,100));
+					var viewL = displaySurfaces[1].viewMatrix(new THREE.Vector3(50,20,100));
+					//var viewR = displaySurfaces[2].viewMatrix(new THREE.Vector3(50,20,100));
+					//var viewB = displaySurfaces[3].viewMatrix(new THREE.Vector3(50,20,100));
+					console.log("View matrices:");
+					console.log(viewF);
+					console.log(viewL);
+					//console.log(viewR);
+					//console.log(viewB);
+					break;
+					
+				case 'KeyY':
+					var projF = displaySurfaces[0].projectionMatrix(new THREE.Vector3(50,20,100), 0.1, 100);
+					var projL = displaySurfaces[1].projectionMatrix(new THREE.Vector3(50,20,100), 0.1, 100);
+					var projR = displaySurfaces[2].projectionMatrix(new THREE.Vector3(50,20,100), 0.1, 100);
+					var projB = displaySurfaces[3].projectionMatrix(new THREE.Vector3(50,20,100), 0.1, 100);
+					console.log("Projection matrices:");
+					console.log(projF);
+					console.log(projL);
+					console.log(projR);
+					console.log(projB);
+					break;
+				
+				case 'KeyV':
+					useVReyes = !useVReyes;
+					break;
 				}
-
 			}
 
 			function onWindowResize() {
@@ -159,90 +190,40 @@
 			}
 
 			//
+			function getLeftEyePosition()
+			{
+				var eye = eyeGroup.getObjectByName("EyeL");
+				return eye.getWorldPosition(new THREE.Vector3());
+			}
+
+			function getRightEyePosition()
+			{
+				var eye = eyeGroup.getObjectByName("EyeR");
+				return eye.getWorldPosition(new THREE.Vector3());
+			}
+
+			function cameraFromViewProj(view, proj)
+			{
+				var cam = camera.clone();
+				var inv = new THREE.Matrix4();
+				inv.copy(view).invert();
+				cam.position.set(inv.elements[12], inv.elements[13], inv.elements[14]);
+				cam.setRotationFromMatrix(view);
+				cam.projectionMatrix = proj.clone();
+				return cam;
+			}
+
+			function handleVRControllerButton(buttonId, source) {
+				if(source.handedness == "right") {
+					switch(buttonId) {
+						case 4: useVReyes = !useVReyes; break;
+						case 5: showScene = !showScene; break;
+					}
+				}
+			}
 
 			function animate() {
 
-				/*
-				const delta = clock.getDelta() * 60;
-
-				if ( controller.userData.isSelecting === true ) {
-
-					const cube = room.children[ 0 ];
-					room.remove( cube );
-
-					cube.position.copy( controller.position );
-					cube.userData.velocity.x = ( Math.random() - 0.5 ) * 0.02 * delta;
-					cube.userData.velocity.y = ( Math.random() - 0.5 ) * 0.02 * delta;
-					cube.userData.velocity.z = ( Math.random() * 0.01 - 0.05 ) * delta;
-					cube.userData.velocity.applyQuaternion( controller.quaternion );
-					room.add( cube );
-
-				}
-
-				// find intersections
-
-				raycaster.setFromXRController( controller );
-
-				const intersects = raycaster.intersectObjects( room.children, false );
-
-				if ( intersects.length > 0 ) {
-
-					if ( INTERSECTED != intersects[ 0 ].object ) {
-
-						if ( INTERSECTED ) INTERSECTED.material.emissive.setHex( INTERSECTED.currentHex );
-
-						INTERSECTED = intersects[ 0 ].object;
-						INTERSECTED.currentHex = INTERSECTED.material.emissive.getHex();
-						INTERSECTED.material.emissive.setHex( 0xff0000 );
-
-					}
-
-				} else {
-
-					if ( INTERSECTED ) INTERSECTED.material.emissive.setHex( INTERSECTED.currentHex );
-
-					INTERSECTED = undefined;
-
-				}
-
-				// Keep cubes inside room
-
-				for ( let i = 0; i < room.children.length; i ++ ) {
-
-					const cube = room.children[ i ];
-
-					cube.userData.velocity.multiplyScalar( 1 - ( 0.001 * delta ) );
-
-					cube.position.add( cube.userData.velocity );
-
-					if ( cube.position.x < - 3 || cube.position.x > 3 ) {
-
-						cube.position.x = THREE.MathUtils.clamp( cube.position.x, - 3, 3 );
-						cube.userData.velocity.x = - cube.userData.velocity.x;
-
-					}
-
-					if ( cube.position.y < 0 || cube.position.y > 6 ) {
-
-						cube.position.y = THREE.MathUtils.clamp( cube.position.y, 0, 6 );
-						cube.userData.velocity.y = - cube.userData.velocity.y;
-
-					}
-
-					if ( cube.position.z < - 3 || cube.position.z > 3 ) {
-
-						cube.position.z = THREE.MathUtils.clamp( cube.position.z, - 3, 3 );
-						cube.userData.velocity.z = - cube.userData.velocity.z;
-
-					}
-
-					cube.rotation.x += cube.userData.velocity.x * 2 * delta;
-					cube.rotation.y += cube.userData.velocity.y * 2 * delta;
-					cube.rotation.z += cube.userData.velocity.z * 2 * delta;
-
-				}
-				
-				*/
 				renderer.render( scene, camera );
 
 			}
