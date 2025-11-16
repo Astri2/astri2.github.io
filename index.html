@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="en">
 	<head>
-		<title>three.js xr - cubes</title>
+		<title>CAVE simulator</title>
 		<meta charset="utf-8">
 		<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
 		<link type="text/css" rel="stylesheet" href="main.css">
@@ -9,16 +9,28 @@
 	<body>
 
 		<div id="info">
-			<a href="https://threejs.org" target="_blank" rel="noopener">three.js</a> xr - interactive cubes
+			CAVE Simulator. The head and teapot are draggable. <br />
+			"L" See from Left Eye | "R" See from Right Eye | "S" toggle show scene  | "V" toggle VR eyes usage<br />
 		</div>
 
 		<script type="module">
 
 			import * as THREE from 'three';
 
+			import { TeapotGeometry } from 'three/examples/jsm/geometries/TeapotGeometry.js';
+			import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
+			import { DragControls } from 'three/examples/jsm/controls/DragControls.js';
+
 			import { BoxLineGeometry } from 'three/addons/geometries/BoxLineGeometry.js';
 			import { XRButton } from 'three/addons/webxr/XRButton.js';
 			import { XRControllerModelFactory } from 'three/addons/webxr/XRControllerModelFactory.js';
+
+			var models;
+			var displaySurfaces, displaySurfaceGroup, displaySurfaceTargets;
+			var eyeGroup, eyeCenter;
+			var orbitControl, controls;
+			var showScene = false, useVReyes = true;
+			const prevButtonStates = new Map();
 
 			const clock = new THREE.Clock();
 
@@ -31,6 +43,15 @@
 			let INTERSECTED;
 
 			init();
+
+			function createLights(group)
+			{
+				var ambientLight = new THREE.AmbientLight(0x888888, 0.4);
+				group.add(ambientLight);
+				var pointLight = new THREE.PointLight(0xffffff, 0.8);
+				pointLight.position.z += 4;
+				group.add(pointLight);
+			}
 
 			function init() {
 
@@ -50,15 +71,19 @@
 				);
 				scene.add( room );
 
+				/*
 				scene.add( new THREE.HemisphereLight( 0xa5a5a5, 0x898989, 3 ) );
 
 				const light = new THREE.DirectionalLight( 0xffffff, 3 );
 				light.position.set( 1, 1, 1 ).normalize();
 				scene.add( light );
+				*/
+
+				createLights(scene)
 
 				const geometry = new THREE.BoxGeometry( 0.15, 0.15, 0.15 );
 
-				for ( let i = 0; i < 200; i ++ ) {
+				for ( let i = 0; i < 0; i ++ ) {
 
 					const object = new THREE.Mesh( geometry, new THREE.MeshLambertMaterial( { color: Math.random() * 0xffffff } ) );
 
@@ -83,8 +108,6 @@
 
 				}
 
-				raycaster = new THREE.Raycaster();
-
 				renderer = new THREE.WebGLRenderer( { antialias: true } );
 				renderer.setPixelRatio( window.devicePixelRatio );
 				renderer.setSize( window.innerWidth, window.innerHeight );
@@ -92,44 +115,7 @@
 				renderer.xr.enabled = true;
 				container.appendChild( renderer.domElement );
 
-				//
-
-				function onSelectStart() {
-
-					this.userData.isSelecting = true;
-
-				}
-
-				function onSelectEnd() {
-
-					this.userData.isSelecting = false;
-
-				}
-
-				controller = renderer.xr.getController( 0 );
-				controller.addEventListener( 'selectstart', onSelectStart );
-				controller.addEventListener( 'selectend', onSelectEnd );
-				controller.addEventListener( 'connected', function ( event ) {
-
-					this.add( buildController( event.data ) );
-
-				} );
-				controller.addEventListener( 'disconnected', function () {
-
-					this.remove( this.children[ 0 ] );
-
-				} );
-				scene.add( controller );
-
-				const controllerModelFactory = new XRControllerModelFactory();
-
-				controllerGrip = renderer.xr.getControllerGrip( 0 );
-				controllerGrip.add( controllerModelFactory.createControllerModel( controllerGrip ) );
-				scene.add( controllerGrip );
-
 				window.addEventListener( 'resize', onWindowResize );
-
-				//
 
 				document.body.appendChild( XRButton.createButton( renderer, {
 					'optionalFeatures': [ 'depth-sensing' ],
@@ -176,6 +162,7 @@
 
 			function animate() {
 
+				/*
 				const delta = clock.getDelta() * 60;
 
 				if ( controller.userData.isSelecting === true ) {
@@ -254,7 +241,8 @@
 					cube.rotation.z += cube.userData.velocity.z * 2 * delta;
 
 				}
-
+				
+				*/
 				renderer.render( scene, camera );
 
 			}
