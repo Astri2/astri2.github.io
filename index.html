@@ -25,7 +25,7 @@
 			import { XRButton } from 'three/addons/webxr/XRButton.js';
 			import { XRControllerModelFactory } from 'three/addons/webxr/XRControllerModelFactory.js';
 
-			var modelsScene;
+			var models, notModels;
 			var displaySurfaces, displaySurfaceGroup, displaySurfaceTargets;
 			var eyeGroup, eyeCenter;
 			var orbitControl, controls;
@@ -115,9 +115,11 @@
 					new BoxLineGeometry( 6, 6, 6, 10, 10, 10 ).translate( 0, 0, 0 ),
 					new THREE.LineBasicMaterial( { color: 0xbcbcbc } )
 				);
-				scene.add( room );
+				notModels = new THREE.Group()
+				scene.add(notModels)
+				notModels.add( room );
 
-				createLights(scene)
+				createLights(notModels)
 
 				renderer = new THREE.WebGLRenderer( { antialias: true } );
 				// TODO: test this
@@ -219,7 +221,7 @@
 					}
 					
 					//createLights(displaySurfaceGroup);
-					scene.add(displaySurfaceGroup);
+					notModels.add(displaySurfaceGroup);
 				}
 				
 				// createEyeScene();
@@ -255,22 +257,22 @@
 					sphere.position.set(eyeR.x, eyeR.y, eyeR.z);
 					head.add(sphere);
 					
-					scene.add(eyeGroup);
+					notModels.add(eyeGroup);
 				}
 
 				// createScene();
 				{
-					modelsScene = new THREE.Scene();
-					createLights(modelsScene)
+					models = new THREE.Group();
+					// createLights(modelsScene)
 
 					var geometry = new TeapotGeometry(0.8, 15);
 					var material = new THREE.MeshStandardMaterial( { color: 0xffffff } );
 					var teapot = new THREE.Mesh(geometry, material);
 					teapot.name = "Teapot";
 					teapot.position.z-=1.4;
-					modelsScene.add( teapot );
+					models.add( teapot );
 
-					// scene.add(models);
+					scene.add(models);
 				}
 
 				// enableOrbitCamera();
@@ -283,7 +285,7 @@
 				// addDragControlToObjects();
 				{
 					
-					var objects = modelsScene.children.slice();
+					var objects = models.children.slice();
 					objects.push(eyeGroup.getObjectByName("Head"));
 										
 					controls = new DragControls( objects, camera, renderer.domElement );
@@ -424,7 +426,11 @@
 			}
 
 			function animate() {
-
+				if(true) {
+					renderer.render(scene, camera)
+					return
+				}
+				
 				// render to the walls
 				const xrActive = renderer.xr.isPresenting;
   				const sceneCam = xrActive ? renderer.xr.getCamera(camera) : camera;
@@ -459,6 +465,8 @@
 				const gl = renderer.getContext();
 				const prevXrEnabled = renderer.xr.enabled;
 				renderer.xr.enabled = false;
+				notModels.visible = false;
+
 				for (let [index, displaySurface] of displaySurfaces.entries()) {
 					
 					renderer.setRenderTarget(displaySurfaceTargets[index]);
@@ -474,7 +482,7 @@
 						const camL = cameraFromViewProj(viewL, projL);
 						
 						// TODO: uncomment
-						renderer.render(modelsScene, camL);
+						renderer.render(scene, camL);
 					}
 
 					// Right eye -> GREEN + BLUE
@@ -487,14 +495,14 @@
 						renderer.clearDepth();
 
 						// TODO: uncomment
-						renderer.render(modelsScene, camR);
+						renderer.render(scene, camR);
 					}
 
 					gl.colorMask(true, true, true, true);
 
 					//displaySurfaceGroup.children[index].visible = true;
 				}
-
+				notModels.visible = true;
 				// Restore XR state
 				renderer.xr.enabled = prevXrEnabled;
 
@@ -503,10 +511,13 @@
 				renderer.setClearColor(0x000000);
 
 				// if you don't want to render the models, disabled them temporarly
-				renderer.render( scene, camera );
-				if(showScene) {
-					renderer.render(modelsScene, camera);
+				if(!showScene) {
+					models.visible = false;
+					eyeGroup.visible = false;
 				}
+				renderer.render( scene, camera );
+				models.visible = true;
+				eyeGroup.visible = true;
 
 				// read VR controllers buttons
 				const session = renderer.xr.getSession();
