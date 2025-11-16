@@ -126,17 +126,10 @@
 				createLights(scene)
 
 				renderer = new THREE.WebGLRenderer( { antialias: true } );
-				// TODO: test this
-				// renderer.autoClear = false;
 				renderer.setPixelRatio( window.devicePixelRatio );
 				renderer.setSize( window.innerWidth, window.innerHeight );
 				renderer.setAnimationLoop( animate );
 				renderer.xr.enabled = true;
-				// TODO: try to fix lights
-				//renderer.outputEncoding = THREE.sRGBEncoding;
-				//renderer.physicallyCorrectLights = true;
-				//renderer.shadowMap.enabled = true;
-				//renderer.shadowMap.type = THREE.PCFSoftShadowMap
 
 				container.appendChild( renderer.domElement );
 
@@ -361,13 +354,13 @@
 				case 'KeyT':
 					var viewF = displaySurfaces[0].viewMatrix(new THREE.Vector3(50,20,100));
 					var viewL = displaySurfaces[1].viewMatrix(new THREE.Vector3(50,20,100));
-					//var viewR = displaySurfaces[2].viewMatrix(new THREE.Vector3(50,20,100));
-					//var viewB = displaySurfaces[3].viewMatrix(new THREE.Vector3(50,20,100));
+					var viewR = displaySurfaces[2].viewMatrix(new THREE.Vector3(50,20,100));
+					var viewB = displaySurfaces[3].viewMatrix(new THREE.Vector3(50,20,100));
 					console.log("View matrices:");
 					console.log(viewF);
 					console.log(viewL);
-					//console.log(viewR);
-					//console.log(viewB);
+					console.log(viewR);
+					console.log(viewB);
 					break;
 					
 				case 'KeyY':
@@ -430,13 +423,7 @@
 			}
 
 			function animate() {
-				// DISABLED ANIMATE
-				if(false) {
-					renderer.render(scene, camera)
-					return
-				}
-				
-				// render to the walls
+				// camera depends on xr usage
 				const xrActive = renderer.xr.isPresenting;
   				const sceneCam = xrActive ? renderer.xr.getCamera(camera) : camera;
 				
@@ -459,59 +446,11 @@
 					eyeR = getRightEyePosition();
 				}
 
-				/*
+				// render to the walls
 				const gl = renderer.getContext();
-				const prevXrEnabled = renderer.xr.enabled;
+				const prevXrEnabled = renderer.xr.enabled; 
+				// must disabled xr to allow multi rendering
 				renderer.xr.enabled = false;
-
-				notModels.visible = false;
-				for (let [index, displaySurface] of displaySurfaces.entries()) {
-					
-					
-					renderer.setRenderTarget(displaySurfaceTargets[index]);
-					renderer.setClearColor(0x404040);
-					renderer.clear();
-
-					// Left eye -> RED
-					gl.colorMask(true, false, false, true);
-					{
-						// const eyeL = getLeftEyePosition();
-						const viewL = displaySurface.viewMatrix(eyeL);
-						const projL = displaySurface.projectionMatrix(eyeL, 0.2, 200);
-						const camL = cameraFromViewProj(viewL, projL);
-						
-						// TODO: uncomment
-						renderer.render(scene, camL);
-					}
-
-					// Right eye -> GREEN + BLUE
-					gl.colorMask(false, true, true, true);
-					{
-						// const eyeR = getRightEyePosition();
-						const viewR = displaySurface.viewMatrix(eyeR);
-						const projR = displaySurface.projectionMatrix(eyeR, 0.2, 200);
-						const camR = cameraFromViewProj(viewR, projR);
-						renderer.clearDepth();
-
-						// TODO: uncomment
-						renderer.render(scene, camR);
-					}
-
-					gl.colorMask(true, true, true, true);
-
-					//displaySurfaceGroup.children[index].visible = true;
-				}
-				notModels.visible = true;
-				// Restore XR state
-				renderer.xr.enabled = prevXrEnabled;
-
-				// Restore target and clear
-				renderer.setRenderTarget(null);
-				renderer.setClearColor(0x000000);
-				*/
-
-				const gl = renderer.getContext();
-			
 				notModels.visible = false;
 				for (let [index, displaySurface] of displaySurfaces.entries()) {
 					renderer.setRenderTarget(displaySurfaceTargets[index]);
@@ -520,7 +459,6 @@
 
 					// Left eye -> RED
 					gl.colorMask(true, false, false, true);
-					// const eyeL = getLeftEyePosition();
 					const viewL = displaySurface.viewMatrix(eyeL);
 					const projL = displaySurface.projectionMatrix(eyeL, 0.2, 200);
 					const camL = cameraFromViewProj(viewL, projL);
@@ -529,30 +467,24 @@
 
 					// Right eye -> GREEN + BLUE
 					gl.colorMask(false, true, true, true);
-					// const eyeR = getRightEyePosition();
 					const viewR = displaySurface.viewMatrix(eyeR);
 					const projR = displaySurface.projectionMatrix(eyeR, 0.2, 200);
 					const camR = cameraFromViewProj(viewR, projR);
 					renderer.clearDepth();
-
+					
 					renderer.render(scene, camR);
 
 					gl.colorMask(true, true, true, true);
-
-					//displaySurfaceGroup.children[index].visible = true;
 				}
 				notModels.visible = true;
+
+				// Restore XR state 
+				renderer.xr.enabled = prevXrEnabled;
 
 				// Restore target and clear
 				renderer.setRenderTarget(null);
 				renderer.setClearColor(0x000000);
 				
-				/*
-
-
-
-				*/
-
 				// if you don't want to render the models, disabled them temporarly
 				if(!showScene) {
 					models.visible = false;
