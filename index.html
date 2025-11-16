@@ -119,7 +119,7 @@
 				scene.add(notModels)
 				notModels.add( room );
 
-				createLights(notModels)
+				createLights(scene)
 
 				renderer = new THREE.WebGLRenderer( { antialias: true } );
 				// TODO: test this
@@ -426,7 +426,8 @@
 			}
 
 			function animate() {
-				if(true) {
+				// DISABLED ANIMATE
+				if(false) {
 					renderer.render(scene, camera)
 					return
 				}
@@ -435,6 +436,7 @@
 				const xrActive = renderer.xr.isPresenting;
   				const sceneCam = xrActive ? renderer.xr.getCamera(camera) : camera;
 				
+				// get eyes coordinates
 				var eyeL;
 				var eyeR;
 				if(xrActive && useVReyes) {
@@ -453,20 +455,12 @@
 					eyeR = getRightEyePosition();
 				}
 
-				// create temporary scene of only the teapot for wall rendering
-				/*
-				const tempScene = new THREE.Scene();
-				createLights(tempScene);
-				modelsScene.children.forEach(child => {
-					tempScene.add(child.clone());
-				});
-				*/
 
 				const gl = renderer.getContext();
 				const prevXrEnabled = renderer.xr.enabled;
 				renderer.xr.enabled = false;
-				notModels.visible = false;
 
+				notModels.visible = false;
 				for (let [index, displaySurface] of displaySurfaces.entries()) {
 					
 					renderer.setRenderTarget(displaySurfaceTargets[index]);
@@ -515,7 +509,7 @@
 					models.visible = false;
 					eyeGroup.visible = false;
 				}
-				renderer.render( scene, camera );
+				renderer.render( scene, sceneCam );
 				models.visible = true;
 				eyeGroup.visible = true;
 
