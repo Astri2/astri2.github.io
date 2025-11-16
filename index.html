@@ -25,7 +25,7 @@
 			import { XRButton } from 'three/addons/webxr/XRButton.js';
 			import { XRControllerModelFactory } from 'three/addons/webxr/XRControllerModelFactory.js';
 
-			var models;
+			var modelsScene;
 			var displaySurfaces, displaySurfaceGroup, displaySurfaceTargets;
 			var eyeGroup, eyeCenter;
 			var orbitControl, controls;
@@ -108,6 +108,7 @@
 
 				camera = new THREE.PerspectiveCamera( 75, window.innerWidth / window.innerHeight, 0.01, 1000 );
 				camera.position.set( 0.2, 0.2, 0.6 );
+				camera.lookAt( 0, 0, 0 );
 				scene.add( camera );
 
 				room = new THREE.LineSegments(
@@ -116,16 +117,24 @@
 				);
 				scene.add( room );
 
-				createLights(scene)
-
+				// TODO: check preserveDrawingBuffer: true
 				renderer = new THREE.WebGLRenderer( { antialias: true } );
+				renderer.autoClear = false;
 				renderer.setPixelRatio( window.devicePixelRatio );
 				renderer.setSize( window.innerWidth, window.innerHeight );
 				renderer.setAnimationLoop( animate );
 				renderer.xr.enabled = true;
 				container.appendChild( renderer.domElement );
 
+				// try to fix lights
+				renderer.outputEncoding = THREE.sRGBEncoding;
+				renderer.physicallyCorrectLights = true;
+				renderer.shadowMap.enabled = true;
+				renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+
 				// CAVE INIT
+				createLights(scene);
+
 				// createDisplaySurfaces();
 				{
 					var side = 6.00;
@@ -183,7 +192,7 @@
 						var v = displaySurface.v;
 				
 						geometry = new THREE.BoxGeometry(u.length(), v.length(), 0.01);
-						var material = new THREE.MeshPhongMaterial( {map: displaySurfaceTargets[index].texture} );
+						var material = new THREE.MeshStandardMaterial( {map: displaySurfaceTargets[index].texture} );
 						var cube = new THREE.Mesh( geometry, material );
 						cube.name = displaySurface.name;
 						if (displaySurface.name == "Left")
@@ -225,7 +234,7 @@
 
 					// add sphere representing head
 					var geometry = new THREE.SphereGeometry( 0.2, 32, 22 );
-					var material = new THREE.MeshPhongMaterial( { color: 0xaaaaaa } );
+					var material = new THREE.MeshStandardMaterial( { color: 0xaaaaaa } );
 					var head = new THREE.Mesh( geometry, material );
 					head.name = "Head";
 					head.position.set(eyeCenter.x, eyeCenter.y, eyeCenter.z);
@@ -233,14 +242,14 @@
 
 					// add spheres representing L/R eyes
 					var geometry = new THREE.SphereGeometry( 0.06, 32, 22 );
-					var material = new THREE.MeshPhongMaterial( { color: 0xff0000 } );
+					var material = new THREE.MeshStandardMaterial( { color: 0xff0000 } );
 					var sphere = new THREE.Mesh( geometry, material );
 					sphere.name = "EyeL";
 					sphere.position.set(eyeL.x, eyeL.y, eyeL.z);
 					head.add(sphere);
 					
 					var geometry = new THREE.SphereGeometry( 0.06, 32, 22 );
-					var material = new THREE.MeshPhongMaterial( { color: 0x0000ff } );
+					var material = new THREE.MeshStandardMaterial( { color: 0x0000ff } );
 					var sphere = new THREE.Mesh( geometry, material );
 					sphere.name = "EyeR";
 					sphere.position.set(eyeR.x, eyeR.y, eyeR.z);
@@ -251,16 +260,18 @@
 
 				// createScene();
 				{
-					models = new THREE.Group();
+					modelsScene = new THREE.Scene();
+					createLights(modelsScene);
+
 
 					var geometry = new TeapotGeometry(0.8, 15);
-					var material = new THREE.MeshPhongMaterial( { color: 0xffffff } );
+					var material = new THREE.MeshStandardMaterial( { color: 0xffffff } );
 					var teapot = new THREE.Mesh(geometry, material);
 					teapot.name = "Teapot";
 					teapot.position.z-=1.4;
-					models.add( teapot );
+					modelsScene.add( teapot );
 
-					scene.add(models);
+					// scene.add(models);
 				}
 
 				// enableOrbitCamera();
@@ -272,8 +283,7 @@
 
 				// addDragControlToObjects();
 				{
-					
-					var objects = models.children.slice();
+					var objects = modelsScene.children.slice();
 					objects.push(eyeGroup.getObjectByName("Head"));
 										
 					controls = new DragControls( objects, camera, renderer.domElement );
@@ -414,9 +424,110 @@
 			}
 
 			function animate() {
+				// render to the walls
+				const xrActive = renderer.xr.isPresenting;
+  				const sceneCam = xrActive ? renderer.xr.getCamera(camera) : camera;
+				
+				var eyeL;
+				var eyeR;
+				if(xrActive && useVReyes) {
+					// xr stereo
+					if (sceneCam.cameras && sceneCam.cameras.length >= 2) {
+						eyeL = new THREE.Vector3().setFromMatrixPosition(sceneCam.cameras[0].matrixWorld);
+						eyeR = new THREE.Vector3().setFromMatrixPosition(sceneCam.cameras[1].matrixWorld);
+					// xr mono
+					} else {
+						eyeL = new THREE.Vector3().setFromMatrixPosition(sceneCam.matrixWorld);
+            			eyeR = eyeL.clone();
+					}
+				} else {
+					// no xr (orbit cam)
+					eyeL = getLeftEyePosition();
+					eyeR = getRightEyePosition();
+				}
 
+				// create temporary scene of only the teapot for wall rendering
+				/*
+				const tempScene = new THREE.Scene();
+				createLights(tempScene);
+				modelsScene.children.forEach(child => {
+					tempScene.add(child.clone());
+				});
+				*/
+
+				const gl = renderer.getContext();
+				const prevXrEnabled = renderer.xr.enabled;
+				renderer.xr.enabled = false;
+				for (let [index, displaySurface] of displaySurfaces.entries()) {
+					
+					renderer.setRenderTarget(displaySurfaceTargets[index]);
+					renderer.setClearColor(0x404040);
+					renderer.clear();
+
+					// Left eye -> RED
+					gl.colorMask(true, false, false, true);
+					{
+						// const eyeL = getLeftEyePosition();
+						const viewL = displaySurface.viewMatrix(eyeL);
+						const projL = displaySurface.projectionMatrix(eyeL, 0.2, 200);
+						const camL = cameraFromViewProj(viewL, projL);
+						
+						// TODO: uncomment
+						renderer.render(modelsScene, camL);
+					}
+
+					// Right eye -> GREEN + BLUE
+					gl.colorMask(false, true, true, true);
+					{
+						// const eyeR = getRightEyePosition();
+						const viewR = displaySurface.viewMatrix(eyeR);
+						const projR = displaySurface.projectionMatrix(eyeR, 0.2, 200);
+						const camR = cameraFromViewProj(viewR, projR);
+						renderer.clearDepth();
+
+						// TODO: uncomment
+						renderer.render(modelsScene, camR);
+					}
+
+					gl.colorMask(true, true, true, true);
+
+					//displaySurfaceGroup.children[index].visible = true;
+				}
+
+				// Restore XR state
+				renderer.xr.enabled = prevXrEnabled;
+
+				// Restore target and clear
+				renderer.setRenderTarget(null);
+				renderer.setClearColor(0x000000);
+
+				// if you don't want to render the models, disabled them temporarly
 				renderer.render( scene, camera );
+				if(showScene) {
+					renderer.render(modelsScene, camera);
+				}
 
+				// read VR controllers buttons
+				const session = renderer.xr.getSession();
+				if (session) {
+					for (const source of session.inputSources) {
+						if (source && source.gamepad) {
+							const gp = source.gamepad;
+							
+							// Get previous states for this controller
+        					let prev = prevButtonStates.get(source) || gp.buttons.map(() => ({ pressed: false }));
+							gp.buttons.forEach((btn, i) => {
+								if (btn.pressed && !prev[i].pressed) {
+									handleVRControllerButton(i, source);
+									// console.log("Button", i, "pressed on controller " + source.handedness);
+								}
+							});
+							// Save current state for next frame
+							prevButtonStates.set(source, gp.buttons.map(b => ({ pressed: b.pressed })));
+						}
+					}
+				}
+				
 			}
 
 		</script>
