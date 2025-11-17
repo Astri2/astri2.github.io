@@ -201,6 +201,135 @@
 				addDragControlToObjects();
 			}
 
+			function createDisplaySurfaces()
+			{
+				var side = 6.00;
+				var half = side / 2.0;
+
+				displaySurfaces = [];
+				// FRONT SCREEN
+				var frontScreen = new DisplaySurface("Front", 
+					new THREE.Vector3(-half, -half, -half), 
+					new THREE.Vector3( side,  0.0,   0.0), 
+					new THREE.Vector3( 0.0,   side,  0.0));
+				displaySurfaces.push(frontScreen);
+
+				// LEFT SCREEN
+				var leftScreen = new DisplaySurface("Left",
+					new THREE.Vector3(-half, -half,  half), 
+					new THREE.Vector3( 0.0,   0.0,  -side), 
+					new THREE.Vector3( 0.0,   side,  0.0));
+				displaySurfaces.push(leftScreen);
+
+				// RIGHT SCREEN
+				var rightScreen = new DisplaySurface("Right",
+					new THREE.Vector3( half, -half, -half), 
+					new THREE.Vector3( 0.0,   0.0,   side),
+					new THREE.Vector3( 0.0,   side,  0.0));
+				displaySurfaces.push(rightScreen);
+
+				// Floor SCREEN
+				var floorScreen = new DisplaySurface("Floor",
+					new THREE.Vector3(-half, -half,  half), 
+					new THREE.Vector3( side,  0.0,   0.0),
+					new THREE.Vector3( 0.0,   0.0,  -side));
+				displaySurfaces.push(floorScreen);
+			}
+
+			function createDisplaySurfaceTargets()
+			{
+				const SIZE = 1024;  // texture resolution
+				displaySurfaceTargets = [];
+			
+				for (var v of displaySurfaces)       
+					displaySurfaceTargets.push(new THREE.WebGLRenderTarget(SIZE, SIZE));
+			}
+
+			function createDisplaySurfaceScene()
+			{
+				displaySurfaceGroup = new THREE.Group();
+
+				// add display surfaces	
+				for (var [index, displaySurface] of displaySurfaces.entries())
+				{
+					var origin = displaySurface.origin;
+					var u = displaySurface.u;
+					var v = displaySurface.v;
+			
+					var geometry = new THREE.BoxGeometry(u.length(), v.length(), 0.01);
+					var material = new THREE.MeshStandardMaterial( {map: displaySurfaceTargets[index].texture} );
+					var cube = new THREE.Mesh( geometry, material );
+					cube.name = displaySurface.name;
+					if (displaySurface.name == "Left")
+						cube.rotation.y = Math.PI / 2;
+				
+					if (displaySurface.name == "Right")
+						cube.rotation.y = - Math.PI / 2;
+						
+					if (displaySurface.name == "Floor")
+					{
+						cube.rotation.x =  Math.PI / 2;
+						cube.rotation.z =  Math.PI ;
+					}
+				
+					var uHalf = u.clone().multiplyScalar(0.5);
+					var vHalf = v.clone().multiplyScalar(0.5);
+					var center = new THREE.Vector3().addVectors(origin, uHalf);
+					center.add(vHalf);
+					cube.position.set(center.x, center.y, center.z);
+					
+					// NEW
+					// displaySurfaceScene.add(cube);
+					displaySurfaceGroup.add(cube);
+				}
+				
+				//createLights(displaySurfaceGroup);
+				notModels.add(displaySurfaceGroup);
+			}
+
+			function enableOrbitCamera()
+			{
+				orbitControl = new OrbitControls(camera, renderer.domElement );
+				orbitControl.minDistance = 2.4;
+				orbitControl.maxDistance = 1000;
+			}
+
+			function createEyeScene()
+			{
+				var IPD = 0.136; 
+				eyeCenter = new THREE.Vector3(1, 0.4, 1);
+				// eye positions relative to the head
+				var eyeL = new THREE.Vector3( - IPD/2, 0.2, -0.12);
+				var eyeR = new THREE.Vector3( + IPD/2, 0.2, -0.12);
+				
+				eyeGroup = new THREE.Group();
+
+				// add sphere representing head
+				var geometry = new THREE.SphereGeometry( 0.2, 32, 22 );
+				var material = new THREE.MeshStandardMaterial( { color: 0xaaaaaa } );
+				var head = new THREE.Mesh( geometry, material );
+				head.name = "Head";
+				head.position.set(eyeCenter.x, eyeCenter.y, eyeCenter.z);
+				eyeGroup.add(head);
+
+				// add spheres representing L/R eyes
+				var geometry = new THREE.SphereGeometry( 0.06, 32, 22 );
+				var material = new THREE.MeshStandardMaterial( { color: 0xff0000 } );
+				var sphere = new THREE.Mesh( geometry, material );
+				sphere.name = "EyeL";
+				sphere.position.set(eyeL.x, eyeL.y, eyeL.z);
+				head.add(sphere);
+				
+				var geometry = new THREE.SphereGeometry( 0.06, 32, 22 );
+				var material = new THREE.MeshStandardMaterial( { color: 0x0000ff } );
+				var sphere = new THREE.Mesh( geometry, material );
+				sphere.name = "EyeR";
+				sphere.position.set(eyeR.x, eyeR.y, eyeR.z);
+				head.add(sphere);
+				
+				notModels.add(eyeGroup);
+			}
+
 			
 			function init() {
 
@@ -234,138 +363,17 @@
 				container.appendChild( renderer.domElement );
 
 				// CAVE INIT
-				// createDisplaySurfaces();
-				{
-					var side = 6.00;
-					var half = side / 2.0;
+				createDisplaySurfaces();
 
-					displaySurfaces = [];
-					// FRONT SCREEN
-					var frontScreen = new DisplaySurface("Front", 
-						new THREE.Vector3(-half, -half, -half), 
-						new THREE.Vector3( side,  0.0,   0.0), 
-						new THREE.Vector3( 0.0,   side,  0.0));
-					displaySurfaces.push(frontScreen);
-
-					// LEFT SCREEN
-					var leftScreen = new DisplaySurface("Left",
-						new THREE.Vector3(-half, -half,  half), 
-						new THREE.Vector3( 0.0,   0.0,  -side), 
-						new THREE.Vector3( 0.0,   side,  0.0));
-					displaySurfaces.push(leftScreen);
-
-					// RIGHT SCREEN
-					var rightScreen = new DisplaySurface("Right",
-						new THREE.Vector3( half, -half, -half), 
-						new THREE.Vector3( 0.0,   0.0,   side),
-						new THREE.Vector3( 0.0,   side,  0.0));
-					displaySurfaces.push(rightScreen);
-
-					// Floor SCREEN
-					var floorScreen = new DisplaySurface("Floor",
-						new THREE.Vector3(-half, -half,  half), 
-						new THREE.Vector3( side,  0.0,   0.0),
-						new THREE.Vector3( 0.0,   0.0,  -side));
-					displaySurfaces.push(floorScreen);
-				}
-
-				// createDisplaySurfaceTargets();
-				{
-					const SIZE = 1024;  // texture resolution
-					displaySurfaceTargets = [];
+				createDisplaySurfaceTargets();
 				
-					for (var v of displaySurfaces)       
-						displaySurfaceTargets.push(new THREE.WebGLRenderTarget(SIZE, SIZE));
-				}
+				createDisplaySurfaceScene();
 				
-
-				// createDisplaySurfaceScene();
-				{
-					displaySurfaceGroup = new THREE.Group();
-
-					// add display surfaces	
-					for (var [index, displaySurface] of displaySurfaces.entries())
-					{
-						var origin = displaySurface.origin;
-						var u = displaySurface.u;
-						var v = displaySurface.v;
+				createEyeScene();
 				
-						geometry = new THREE.BoxGeometry(u.length(), v.length(), 0.01);
-						var material = new THREE.MeshStandardMaterial( {map: displaySurfaceTargets[index].texture} );
-						var cube = new THREE.Mesh( geometry, material );
-						cube.name = displaySurface.name;
-						if (displaySurface.name == "Left")
-							cube.rotation.y = Math.PI / 2;
-					
-						if (displaySurface.name == "Right")
-							cube.rotation.y = - Math.PI / 2;
-							
-						if (displaySurface.name == "Floor")
-						{
-							cube.rotation.x =  Math.PI / 2;
-							cube.rotation.z =  Math.PI ;
-						}
-					
-						var uHalf = u.clone().multiplyScalar(0.5);
-						var vHalf = v.clone().multiplyScalar(0.5);
-						var center = new THREE.Vector3().addVectors(origin, uHalf);
-						center.add(vHalf);
-						cube.position.set(center.x, center.y, center.z);
-						
-						// NEW
-						// displaySurfaceScene.add(cube);
-						displaySurfaceGroup.add(cube);
-					}
-					
-					//createLights(displaySurfaceGroup);
-					notModels.add(displaySurfaceGroup);
-				}
-				
-				// createEyeScene();
-				{
-					var IPD = 0.136; 
-					eyeCenter = new THREE.Vector3(1, 0.4, 1);
-					// eye positions relative to the head
-					var eyeL = new THREE.Vector3( - IPD/2, 0.2, -0.12);
-					var eyeR = new THREE.Vector3( + IPD/2, 0.2, -0.12);
-					
-					eyeGroup = new THREE.Group();
-
-					// add sphere representing head
-					var geometry = new THREE.SphereGeometry( 0.2, 32, 22 );
-					var material = new THREE.MeshStandardMaterial( { color: 0xaaaaaa } );
-					var head = new THREE.Mesh( geometry, material );
-					head.name = "Head";
-					head.position.set(eyeCenter.x, eyeCenter.y, eyeCenter.z);
-					eyeGroup.add(head);
-
-					// add spheres representing L/R eyes
-					var geometry = new THREE.SphereGeometry( 0.06, 32, 22 );
-					var material = new THREE.MeshStandardMaterial( { color: 0xff0000 } );
-					var sphere = new THREE.Mesh( geometry, material );
-					sphere.name = "EyeL";
-					sphere.position.set(eyeL.x, eyeL.y, eyeL.z);
-					head.add(sphere);
-					
-					var geometry = new THREE.SphereGeometry( 0.06, 32, 22 );
-					var material = new THREE.MeshStandardMaterial( { color: 0x0000ff } );
-					var sphere = new THREE.Mesh( geometry, material );
-					sphere.name = "EyeR";
-					sphere.position.set(eyeR.x, eyeR.y, eyeR.z);
-					head.add(sphere);
-					
-					notModels.add(eyeGroup);
-				}
-
 				createScene();
 
-				// enableOrbitCamera();
-				{
-					orbitControl = new OrbitControls(camera, renderer.domElement );
-					orbitControl.minDistance = 2.4;
-					orbitControl.maxDistance = 1000;
-				}
-
+				enableOrbitCamera();
 
 				renderer.xr.addEventListener('sessionstart', () => { 
 					orbitControl.enabled = false; 
