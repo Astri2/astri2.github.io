@@ -10,7 +10,9 @@
 
 		<div id="info">
 			CAVE Simulator. The head and teapot are draggable. <br />
-			"L" See from Left Eye | "R" See from Right Eye | "S" toggle show scene  | "V" toggle VR eyes usage<br />
+			"L" See from Left Eye | "R" See from Right Eye | "S" toggle show scene  | "V" toggle VR eyes usage (XR simulator)<br />
+			"-" and "+" to move the eyes or rescale the selected object<br />
+			On XR Controller: "A" toggle VR eyes usage | "B" toggle show scene
 		</div>
 
 		<script type="module">
@@ -24,6 +26,8 @@
 			import { BoxLineGeometry } from 'three/addons/geometries/BoxLineGeometry.js';
 			import { XRButton } from 'three/addons/webxr/XRButton.js';
 			import { XRControllerModelFactory } from 'three/addons/webxr/XRControllerModelFactory.js';
+
+			import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 
 			var models, notModels;
 			var displaySurfaces, displaySurfaceGroup, displaySurfaceTargets;
@@ -39,6 +43,8 @@
 
 			let controller, controllerGrip;
 			let INTERSECTED;
+
+			var selectedObj = null;
 
 			class DisplaySurface 
 			{
@@ -93,15 +99,109 @@
 			{
 				// Lights
 				const hemiLight = new THREE.HemisphereLight(0xffffff, 0x444444, 1.0);
-				hemiLight.position.set(0, 20, 0);
+				//hemiLight.position.set(0, 20, 0);
 				scene.add(hemiLight);
 
 				const dirLight = new THREE.DirectionalLight(0xffffff, 0.8);
-				dirLight.position.set(5, 10, 7.5);
+				dirLight.position.set(1,1,1); //5, 10, 7.5
 				dirLight.castShadow = true;
 				scene.add(dirLight);
 			}
 
+			function clampEyesPos()
+			{
+				var eyeL = eyeGroup.getObjectByName("EyeL");
+				var eyeR = eyeGroup.getObjectByName("EyeR");
+				eyeL.position.x = THREE.MathUtils.clamp(eyeL.position.x, -0.64, -0.068);
+				eyeL.position.y = 0.2;
+				eyeL.position.z = -0.12;
+				eyeR.position.x = THREE.MathUtils.clamp(eyeR.position.x, 0.068, 0.64);
+				eyeR.position.y = 0.2;
+				eyeR.position.z = -0.12;
+			}
+
+			function addDragControlToObjects()
+			{
+				
+				var objects = models.children.slice();
+				objects.push(eyeGroup.getObjectByName("Head"));
+									
+				controls = new DragControls( objects, camera, renderer.domElement );
+				controls.addEventListener( 'hoveron', function ( event ) 
+					{
+						orbitControl.enabled = false;
+					} );
+				controls.addEventListener( 'hoveroff', function ( event ) 
+					{
+							orbitControl.enabled = true;
+					} );
+				controls.addEventListener( 'dragstart', function ( event ) 
+					{
+						event.object.material.emissive.set( 0xaaaaaa );
+						selectedObj = event.object;
+					} );
+				controls.addEventListener( 'dragend', function ( event ) 
+					{
+						event.object.material.emissive.set( 0x000000 );
+						selectedObj = null;
+					} );
+				controls.enabled = showScene
+			}
+
+			function loadGLTF(url) {
+				return new Promise((resolve, reject) => {
+					new GLTFLoader().load(url, gltf => resolve(gltf.scene), undefined, err => reject(err));
+				});
+			}
+
+			async function createScene()
+			{
+				models = new THREE.Group();
+				// createLights(modelsScene)
+
+				var geometry = new TeapotGeometry(0.8, 15);
+				var material = new THREE.MeshStandardMaterial( { color: 0xffffff } );
+				var teapot = new THREE.Mesh(geometry, material);
+				teapot.name = "Teapot";
+				teapot.position.z-=1.4;
+				models.add( teapot );
+
+				
+				const duck = await loadGLTF("https://raw.githubusercontent.com/KhronosGroup/glTF-Sample-Models/master/2.0/Duck/glTF/Duck.gltf");
+				duck.scale.set(0.4,0.4,0.4);
+
+				const yellowDuck = duck.clone();
+				yellowDuck.name = "yellowDuck";
+				yellowDuck.position.set(2, 1, -1); 
+				models.add(yellowDuck);
+
+				const redDuck = duck.clone();
+				redDuck.name = "redDuck";
+				redDuck.traverse((child) => {
+					if (child.isMesh) {
+						child.material = child.material.clone(); 
+						child.material.color.set(0xd20103);
+					}
+				});
+				redDuck.position.set(-2, -2, 0.8); 
+				models.add(redDuck);
+
+				const greenDuck = duck.clone();
+				greenDuck.name = "greenDuck";
+				greenDuck.traverse((child) => {
+					if (child.isMesh) {
+						child.material = child.material.clone(); 
+						child.material.color.set(0x00da00);  
+					}
+				});
+				greenDuck.position.set(2, -2, 0.8); 
+				models.add(greenDuck);
+
+				scene.add(models);
+				addDragControlToObjects();
+			}
+
+			
 			function init() {
 
 				container = document.createElement( 'div' );
@@ -257,20 +357,7 @@
 					notModels.add(eyeGroup);
 				}
 
-				// createScene();
-				{
-					models = new THREE.Group();
-					// createLights(modelsScene)
-
-					var geometry = new TeapotGeometry(0.8, 15);
-					var material = new THREE.MeshStandardMaterial( { color: 0xffffff } );
-					var teapot = new THREE.Mesh(geometry, material);
-					teapot.name = "Teapot";
-					teapot.position.z-=1.4;
-					models.add( teapot );
-
-					scene.add(models);
-				}
+				createScene();
 
 				// enableOrbitCamera();
 				{
@@ -279,31 +366,6 @@
 					orbitControl.maxDistance = 1000;
 				}
 
-				// addDragControlToObjects();
-				{
-					
-					var objects = models.children.slice();
-					objects.push(eyeGroup.getObjectByName("Head"));
-										
-					controls = new DragControls( objects, camera, renderer.domElement );
-					controls.addEventListener( 'hoveron', function ( event ) 
-						{
-							orbitControl.enabled = false;
-						} );
-					controls.addEventListener( 'hoveroff', function ( event ) 
-						{
-								orbitControl.enabled = true;
-						} );
-					controls.addEventListener( 'dragstart', function ( event ) 
-						{
-							event.object.material.emissive.set( 0xaaaaaa );
-						} );
-					controls.addEventListener( 'dragend', function ( event ) 
-						{
-							event.object.material.emissive.set( 0x000000 );
-						} );
-					controls.enabled = showScene
-				}
 
 				renderer.xr.addEventListener('sessionstart', () => { 
 					orbitControl.enabled = false; 
@@ -377,6 +439,32 @@
 				
 				case 'KeyV':
 					useVReyes = !useVReyes;
+					break;
+
+				case 'Equal':
+					if(selectedObj == null){
+						var eyeL = eyeGroup.getObjectByName("EyeL");
+						var eyeR = eyeGroup.getObjectByName("EyeR");
+						eyeL.position.x -= 1/50;
+						eyeR.position.x += 1/50;
+
+						clampEyesPos();
+					}else{
+						selectedObj.scale.multiplyScalar(1.1);
+					}
+                
+                break; 
+                
+            	case 'Minus':
+					if(selectedObj == null){
+						var eyeL = eyeGroup.getObjectByName("EyeL");
+						var eyeR = eyeGroup.getObjectByName("EyeR");
+						eyeL.position.x += 1/50;
+						eyeR.position.x -= 1/50;
+						clampEyesPos();
+					}else{
+						selectedObj.scale.multiplyScalar(1/1.1);                    
+					}
 					break;
 				}
 			}
