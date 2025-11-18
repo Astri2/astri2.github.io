@@ -53,3 +53,34 @@ a, button, input, select {
 	user-select: none;
 	z-index: 2 !important; /* TODO Solve this in HTML */
 }
+
+
+.myBtnTrue {
+	background-color: gray;
+	color: white;
+	border: none;
+	padding: 5px 10px;
+	border-radius: 10px; /* rounded corners */
+	cursor: pointer;
+	border: 2px solid #404040;
+	text-transform: none;
+}
+
+.myBtnFalse {
+	background-color: #4a4a4a;
+	color: #cccccc;
+	border: none;
+	padding: 5px 10px;
+	border-radius: 10px; /* rounded corners */
+	cursor: pointer;
+	border: 2px solid #2e2e2e;
+	text-transform: none;
+  }
+
+.myBtnTrue:hover {
+	background-color: #6e6e6e;
+}
+
+.myBtnFalse:hover {
+	background-color: #5c5c5c;
+}
