@@ -33,7 +33,7 @@
 			var displaySurfaces, displaySurfaceGroup, displaySurfaceTargets;
 			var eyeGroup, eyeCenter;
 			var orbitControl, controls;
-			var showScene = false, useVReyes = true;
+			var showScene = true, useVReyes = true;
 			const prevButtonStates = new Map();
 
 			let container;
@@ -102,7 +102,7 @@
 				//hemiLight.position.set(0, 20, 0);
 				scene.add(hemiLight);
 
-				const dirLight = new THREE.DirectionalLight(0xffffff, 0.8);
+				const dirLight = new THREE.DirectionalLight(0xffffff, 4);
 				dirLight.position.set(1,1,1); //5, 10, 7.5
 				dirLight.castShadow = true;
 				scene.add(dirLight);
@@ -418,7 +418,7 @@
 					
 				case 'KeyS':
 					showScene = !showScene;
-					controls.enabled = showScene
+					controls.enabled = showScene && !renderer.xr.isPresenting
 					break;
 					
 				case 'KeyT':
