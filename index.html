@@ -542,10 +542,6 @@
 					eyeR = getRightEyePosition();
 				}
 
-				const prevXrEnabled = renderer.xr.enabled; 
-				// must disabled xr to allow multi rendering
-				renderer.xr.enabled = false;
-
 				// if you don't want to render the models, disabled them temporarly
 				if(!showScene) {
 					models.visible = false;
@@ -557,7 +553,9 @@
 
 				// render to the walls
 				const gl = renderer.getContext();
-				
+				const prevXrEnabled = renderer.xr.enabled; 
+				// must disabled xr to allow multi rendering
+				renderer.xr.enabled = false;
 				notModels.visible = false;
 				for (let [index, displaySurface] of displaySurfaces.entries()) {
 					renderer.setRenderTarget(displaySurfaceTargets[index]);
