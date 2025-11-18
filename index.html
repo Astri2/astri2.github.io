@@ -33,7 +33,7 @@
 			var displaySurfaces, displaySurfaceGroup, displaySurfaceTargets;
 			var eyeGroup, eyeCenter;
 			var orbitControl, controls;
-			var showScene = true, useVReyes = true;
+			var showScene = false, useVReyes = true;
 			const prevButtonStates = new Map();
 
 			let container;
@@ -586,7 +586,10 @@
 				// Restore target and clear
 				renderer.setRenderTarget(null);
 				renderer.setClearColor(0x000000);
-				
+
+				// Restore XR state 
+				renderer.xr.enabled = prevXrEnabled;
+
 				// if you don't want to render the models, disabled them temporarly
 				if(!showScene) {
 					models.visible = false;
@@ -595,9 +598,6 @@
 				renderer.render( scene, sceneCam );
 				models.visible = true;
 				eyeGroup.visible = true;
-
-				// Restore XR state 
-				renderer.xr.enabled = prevXrEnabled;
 
 				// read VR controllers buttons
 				const session = renderer.xr.getSession();
