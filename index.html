@@ -590,15 +590,6 @@
 				// Restore XR state 
 				renderer.xr.enabled = prevXrEnabled;
 
-				// if you don't want to render the models, disabled them temporarly
-				if(!showScene) {
-					models.visible = false;
-					eyeGroup.visible = false;
-				}
-				renderer.render( scene, sceneCam );
-				models.visible = true;
-				eyeGroup.visible = true;
-
 				// read VR controllers buttons
 				const session = renderer.xr.getSession();
 				if (session) {
