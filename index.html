@@ -33,7 +33,7 @@
 			var displaySurfaces, displaySurfaceGroup, displaySurfaceTargets;
 			var eyeGroup, eyeCenter;
 			var orbitControl, controls;
-			var showScene = false, useVReyes = true;
+			var showScene = true, useVReyes = true;
 			const prevButtonStates = new Map();
 
 			let container;
@@ -542,6 +542,15 @@
 					eyeR = getRightEyePosition();
 				}
 
+				// if you don't want to render the models, disabled them temporarly
+				if(!showScene) {
+					models.visible = false;
+					eyeGroup.visible = false;
+				}
+				renderer.render( scene, sceneCam );
+				models.visible = true;
+				eyeGroup.visible = true;
+
 				// render to the walls
 				const gl = renderer.getContext();
 				const prevXrEnabled = renderer.xr.enabled; 
@@ -580,15 +589,6 @@
 				// Restore target and clear
 				renderer.setRenderTarget(null);
 				renderer.setClearColor(0x000000);
-				
-				// if you don't want to render the models, disabled them temporarly
-				if(!showScene) {
-					models.visible = false;
-					eyeGroup.visible = false;
-				}
-				renderer.render( scene, sceneCam );
-				models.visible = true;
-				eyeGroup.visible = true;
 
 				// read VR controllers buttons
 				const session = renderer.xr.getSession();
